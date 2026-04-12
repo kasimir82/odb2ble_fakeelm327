@@ -2,6 +2,8 @@
 #include "esphome/core/log.h"
 #include "esp_task_wdt.h"
 #include <regex>
+#include <algorithm> // 用于 std::remove
+#include <cctype>    // 用于 isxdigit
 
 #ifdef USE_ESP32
 
