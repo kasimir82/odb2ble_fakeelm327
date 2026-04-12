@@ -363,7 +363,46 @@ void OBD2BLEClient::on_write() {
 
 void OBD2BLEClient::on_notify(const std::vector<uint8_t> &data) {
   //ESP_LOGD(TAG, "Received data: %s", format_hex_pretty(data).c_str());
-  
+//response.erase(std::remove(response.begin(), response.end(), '\r'), response.end());
+//response.erase(std::remove(response.begin(), response.end(), '\n'), response.end());
+//response.erase(std::remove(response.begin(), response.end(), '>'), response.end());
+
+ESP_LOGV(TAG, "Notification received: %s", response.c_str());
+
+// 核心：处理解密握手
+if (this->awaiting_vin_crypto_ && !this->crypto_done_) {
+    if (response.length() >= 8) {
+        // 从后往前搜，适配“8位在近乎末尾”的情况
+        for (int i = response.length() - 8; i >= 0; i--) {
+            std::string candidate = response.substr(i, 8);
+            
+            // 检查是否为纯 HEX
+            bool is_hex = true;
+            for (char c : candidate) {
+                if (!isxdigit(c)) { is_hex = false; break; }
+            }
+
+            if (is_hex) {
+                ESP_LOGI(TAG, "捕捉到加密源文本: %s", candidate.c_str());
+                std::string key = calculate_unlock_key(candidate);
+                ESP_LOGI(TAG, "计算出解锁 Key: %s", key.c_str());
+
+                // 构造并插入解锁指令
+                OBD2Task unlock_task;
+                unlock_task.command = "AT+SETCRYPT" + key;
+                unlock_task.status = PENDING;
+                
+                // 插入到当前任务的下一个位置
+                task_queue_.insert(task_queue_.begin() + current_task_index_ + 1, unlock_task);
+                
+                // 状态转换
+                this->awaiting_vin_crypto_ = false;
+                this->crypto_done_ = true;
+                return; // 处理完即退出，不进入常规传感器解析逻辑
+            }
+        }
+    }
+}  
   if (current_task_index_ < task_queue_.size()) {
     response_buffer_.insert(response_buffer_.end(), data.begin(), data.end());
     parse_response();
