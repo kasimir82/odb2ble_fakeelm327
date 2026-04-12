@@ -714,6 +714,7 @@ void OBD2BLEClient::parse_payload(OBD2Task &task, std::string &can_id_str, uint8
       }
       break;
     case 0x62:  // Mode 22
+      /*
       if (response_data[2] == 0x00 || response_data[2] == 0x20 || response_data[2] == 0x40 || response_data[2] == 0x60 || response_data[2] == 0x80 || response_data[2] == 0xA0 || response_data[2] == 0xC0 || response_data[2] == 0xE0) {
         std::string pids_str;
         size_t pids_num;
@@ -722,8 +723,9 @@ void OBD2BLEClient::parse_payload(OBD2Task &task, std::string &can_id_str, uint8
           ESP_LOGI(TAG, "CAN ID: %s, Mode: %s, Supported PIDs: %s, total %d", can_id_str.c_str(), format_hex_pretty(response_data[0]).c_str(), pids_str.c_str(), pids_num);
         }
       } else {
+      */
         handle_mode_22(task, response_data);
-      }
+      //}
     default:
       break;
   }
