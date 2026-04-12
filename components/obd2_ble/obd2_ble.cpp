@@ -370,22 +370,19 @@ void OBD2BLEClient::on_notify(const std::vector<uint8_t> &data) {
 
   ESP_LOGV(TAG, "Notification received: %s", response.c_str());
 
-  // --- 核心修改：基于 "crypt:" 索引处理解密握手 ---
+  // --- 处理解密握手 ---
   if (this->awaiting_vin_crypto_ && !this->crypto_done_) {
     size_t pos = response.find("crypt:");
     if (pos != std::string::npos) {
-      // 检查冒号后是否有足够的长度 (8位)
       if (response.length() >= pos + 6 + 8) {
-        std::string candidate = response.substr(pos + 6, 8); // 跳过 "crypt:" 这6个字符
+        std::string candidate = response.substr(pos + 6, 8);
 
-        // 验证这8位是否为合法的十六进制
         bool is_hex = true;
         for (char c : candidate) {
           if (!isxdigit(c)) { is_hex = false; break; }
         }
 
         if (is_hex) {
-          // 找到合规代码，立即闭锁状态位
           this->awaiting_vin_crypto_ = false;
           this->crypto_done_ = true;
 
@@ -393,19 +390,16 @@ void OBD2BLEClient::on_notify(const std::vector<uint8_t> &data) {
           std::string key = calculate_unlock_key(candidate);
           ESP_LOGI(TAG, "计算出解锁 Key: %s", key.c_str());
 
-          // 构造并插入解锁指令
           OBD2Task unlock_task;
           unlock_task.command = "AT+SETCRYPT" + key;
           unlock_task.status = PENDING;
           task_queue_.insert(task_queue_.begin() + current_task_index_ + 1, unlock_task);
           
-          return; // 处理完握手直接退出，不参与下方的数据解析
-        } else {
-          ESP_LOGW(TAG, "找到 crypt: 标签但后续字符 %s 不是合法 HEX", candidate.c_str());
+          return; // 握手处理完直接返回，不跑下面的常规解析
         }
       }
     }
-  }
+  } // <--- 这里的括号必须准确
 
   // --- 常规任务解析 ---
   if (current_task_index_ < task_queue_.size()) {
@@ -414,16 +408,7 @@ void OBD2BLEClient::on_notify(const std::vector<uint8_t> &data) {
   } else {
     ESP_LOGW(TAG, "GATT notify event received, but no current task available!");
   }
-}
-
-  // --- 常规任务解析 ---
-  if (current_task_index_ < task_queue_.size()) {
-    response_buffer_.insert(response_buffer_.end(), data.begin(), data.end());
-    parse_response();
-  } else {
-    ESP_LOGW(TAG, "GATT notify event received, but no current task available!");
-  }
-}
+} 
 
 void OBD2BLEClient::on_disconnect() {
   gattc_if_ = 0;
