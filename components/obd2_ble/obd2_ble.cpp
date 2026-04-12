@@ -10,6 +10,30 @@ namespace obd2_ble {
 
 static const char *TAG = "obd2_ble";
 
+std::string OBD2BLEClient::calculate_unlock_key(std::string crypt_hex) {
+    uint32_t t = (uint32_t)strtoul(crypt_hex.c_str(), nullptr, 16);
+    uint32_t a = 641571454;
+
+    uint8_t n = t & 0xFF;
+    uint8_t i = (t >> 8) & 0xFF;
+    uint8_t o = (t >> 16) & 0xFF;
+    uint8_t d = (t >> 24) & 0xFF;
+
+    // 严格遵循优先级计算
+    uint32_t r = (o >> (n / 50)) | (i << 2) ^ (a << (d / 12));
+    uint32_t s = (n >> (i / 63)) | (a << (d / 11)) ^ (o >> 1);
+    uint32_t l = (n >> (i / 46)) | (a << (n / 34)) ^ d;
+    // 这里的括号非常关键，确保位移先于位与执行
+    uint32_t m = (i << (d / 35)) | ((a << (n / 49)) & (a >> 18));
+
+    // 按照 m, l, s, r 顺序组合成 32 位整数
+    uint32_t c = (m << 24 & 0xFF000000) | (l << 16 & 0x00FF0000) | (s << 8 & 0x0000FF00) | (r & 0xFF);
+
+    char buf[9];
+    sprintf(buf, "%08X", c);
+    return std::string(buf);
+}
+
 void OBD2BLEClient::setup() {
   ESP_LOGD(TAG, "Setting up OBD2 BLE Client...");
   string_to_uuid(this->service_uuid_str_, &this->service_uuid_);
