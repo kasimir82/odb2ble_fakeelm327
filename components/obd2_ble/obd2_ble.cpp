@@ -242,7 +242,7 @@ void OBD2BLEClient::process_task(OBD2Task &task, const int &command_delay, const
     if (task.command == "AT+VERSION") {
     this->awaiting_vin_crypto_ = true;
     this->crypto_done_ = false; // 允许重新握手
-    ESP_LOGD(TAG, "检测到 AT+VERSION，准备捕获加密 HEX...");
+    //ESP_LOGD(TAG, "检测到 AT+VERSION，准备捕获加密 HEX...");
     }
   if (current_time - last_command_time_ >= command_delay) {
     switch (task.status) {
