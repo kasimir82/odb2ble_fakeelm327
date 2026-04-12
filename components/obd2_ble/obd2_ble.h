@@ -144,7 +144,6 @@ class OBD2BLEClient : public esphome::ble_client::BLEClientNode, public Componen
  private:
     bool awaiting_vin_crypto_ = false; // 标记是否发出了 AT+VERSION 在等回复
     bool crypto_done_ = false;         // 标记是否已经完成了解密握手
-    std::string calculate_unlock_key(std::string crypt_hex); // 声明函数
   size_t current_task_index_ = 0;
   std::string last_command_;
   unsigned long last_command_time_ = 0;
