@@ -1075,43 +1075,50 @@ void OBD2BLEClient::handle_mode_09(OBD2Task &task, const std::vector<uint8_t> &d
 }
 
 void OBD2BLEClient::handle_mode_22(OBD2Task &task, const std::vector<uint8_t> &data) {
+  if (data.size() < 4) return; // 确保至少有 0x62 + PID(2字节) + 数据(1字节)
+
   uint16_t pid = (data[1] << 8) | data[2];
+  uint8_t A = data[3]; // 第一个数据字节
+
   switch (pid) {
-    case 0x10A6:
-    case 0x10B2:
-    case 0x10B4:
-    case 0x10B5:
-    case 0x10E3:
-    case 0x1121:
-    case 0x1137:
-    case 0x1231:
-    case 0x1232:
-    case 0x1233:
-    case 0x1234:
-    case 0x124A:
-    case 0x124C:
     case 0x1940: // 变速箱油温
-      if (data.size() > 3) {
-        // 使用 data[3] 进行计算，A - 40
-        task.value_f = (float)data[3] - 40.0f;
-        ESP_LOGD(TAG, "解析变速箱油温 (PID 1940): %.1f °C", task.value_f);
-      }
-      break;
-      
-    // 其他 GM 常见的 A-40 系列 PID
-    case 0x1137: // 可能是机油温度等
-      if (data.size() > 3) {
-        task.value_f = (float)data[3] - 40.0f;
-      }
+      task.value_f = (float)A - 40.0f;
       break;
 
-    default: 
-      ESP_LOGW(TAG, "未定义的 Mode 22 PID: %04X", pid);
+    case 0x1137: // 发动机机油温度
+      task.value_f = (float)A - 40.0f;
       break;
-    default: break;
+
+    case 0x1153: // 机油寿命百分比
+      // GM 逻辑：有些直接返回百分比，有些返回 0-255
+      task.value_f = (float)A * 100.0f / 255.0f;
+      break;
+
+    case 0x2411: // 油箱剩余油量 (升)
+      // 这里的 A 通常直接代表升数
+      task.value_f = (float)A;
+      break;
+
+    case 0x1990: // 变速箱当前档位
+      // 返回 1-6 代表档位，0 代表 P/N
+      task.value_f = (float)A;
+      break;
+
+    case 0x1302: // 刹车踏板位置 (%)
+      task.value_f = (float)A * 100.0f / 255.0f;
+      break;
+
+    case 0x115E: // 电池电流 (安培)
+      // 注意：这是带符号位的数据，A>128 为放电，A<128 为充电（视具体协议可能相反）
+      // 通用典型公式：(int8_t)A * 0.1
+      task.value_f = (float)((int8_t)A) * 0.1f;
+      break;
+
+    default:
+      ESP_LOGW(TAG, "收到未定义的 Mode 22 PID: %04X, 数据: %02X", pid, A);
+      break;
   }
 }
-
 void OBD2BLEClient::handle_dtc_response(OBD2Task &task, const std::vector<uint8_t> &data) {
   task.value_s = "";
   if (data.size() <= 2) {
