@@ -363,9 +363,10 @@ void OBD2BLEClient::on_write() {
 
 void OBD2BLEClient::on_notify(const std::vector<uint8_t> &data) {
   //ESP_LOGD(TAG, "Received data: %s", format_hex_pretty(data).c_str());
-//response.erase(std::remove(response.begin(), response.end(), '\r'), response.end());
-//response.erase(std::remove(response.begin(), response.end(), '\n'), response.end());
-//response.erase(std::remove(response.begin(), response.end(), '>'), response.end());
+std::string response(data.begin(), data.end());
+response.erase(std::remove(response.begin(), response.end(), '\r'), response.end());
+response.erase(std::remove(response.begin(), response.end(), '\n'), response.end());
+response.erase(std::remove(response.begin(), response.end(), '>'), response.end());
 
 ESP_LOGV(TAG, "Notification received: %s", response.c_str());
 
