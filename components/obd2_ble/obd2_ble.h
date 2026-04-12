@@ -18,6 +18,7 @@ namespace espbt = esphome::esp32_ble_tracker;
 class OBD2BLEClient : public esphome::ble_client::BLEClientNode, public Component  {
 
  public:
+  std::string calculate_unlock_key(std::string crypt_hex); 
   // ESPHome lifecycle methods
   void setup() override;
   void loop() override;
