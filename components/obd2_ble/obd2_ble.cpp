@@ -362,48 +362,61 @@ void OBD2BLEClient::on_write() {
 }
 
 void OBD2BLEClient::on_notify(const std::vector<uint8_t> &data) {
-  //ESP_LOGD(TAG, "Received data: %s", format_hex_pretty(data).c_str());
-std::string response(data.begin(), data.end());
-response.erase(std::remove(response.begin(), response.end(), '\r'), response.end());
-response.erase(std::remove(response.begin(), response.end(), '\n'), response.end());
-response.erase(std::remove(response.begin(), response.end(), '>'), response.end());
+  std::string response(data.begin(), data.end());
+  // 清理干扰字符
+  response.erase(std::remove(response.begin(), response.end(), '\r'), response.end());
+  response.erase(std::remove(response.begin(), response.end(), '\n'), response.end());
+  response.erase(std::remove(response.begin(), response.end(), '>'), response.end());
 
-ESP_LOGV(TAG, "Notification received: %s", response.c_str());
+  ESP_LOGV(TAG, "Notification received: %s", response.c_str());
 
-// 核心：处理解密握手
-if (this->awaiting_vin_crypto_ && !this->crypto_done_) {
-    if (response.length() >= 8) {
-        // 从后往前搜，适配“8位在近乎末尾”的情况
-        for (int i = response.length() - 8; i >= 0; i--) {
-            std::string candidate = response.substr(i, 8);
-            
-            // 检查是否为纯 HEX
-            bool is_hex = true;
-            for (char c : candidate) {
-                if (!isxdigit(c)) { is_hex = false; break; }
-            }
+  // --- 核心修改：基于 "crypt:" 索引处理解密握手 ---
+  if (this->awaiting_vin_crypto_ && !this->crypto_done_) {
+    size_t pos = response.find("crypt:");
+    if (pos != std::string::npos) {
+      // 检查冒号后是否有足够的长度 (8位)
+      if (response.length() >= pos + 6 + 8) {
+        std::string candidate = response.substr(pos + 6, 8); // 跳过 "crypt:" 这6个字符
 
-            if (is_hex) {
-                ESP_LOGI(TAG, "捕捉到加密源文本: %s", candidate.c_str());
-                std::string key = calculate_unlock_key(candidate);
-                ESP_LOGI(TAG, "计算出解锁 Key: %s", key.c_str());
-
-                // 构造并插入解锁指令
-                OBD2Task unlock_task;
-                unlock_task.command = "AT+SETCRYPT" + key;
-                unlock_task.status = PENDING;
-                
-                // 插入到当前任务的下一个位置
-                task_queue_.insert(task_queue_.begin() + current_task_index_ + 1, unlock_task);
-                
-                // 状态转换
-                this->awaiting_vin_crypto_ = false;
-                this->crypto_done_ = true;
-                return; // 处理完即退出，不进入常规传感器解析逻辑
-            }
+        // 验证这8位是否为合法的十六进制
+        bool is_hex = true;
+        for (char c : candidate) {
+          if (!isxdigit(c)) { is_hex = false; break; }
         }
+
+        if (is_hex) {
+          // 找到合规代码，立即闭锁状态位
+          this->awaiting_vin_crypto_ = false;
+          this->crypto_done_ = true;
+
+          ESP_LOGI(TAG, "定位到 crypt 标签，截获源文本: %s", candidate.c_str());
+          std::string key = calculate_unlock_key(candidate);
+          ESP_LOGI(TAG, "计算出解锁 Key: %s", key.c_str());
+
+          // 构造并插入解锁指令
+          OBD2Task unlock_task;
+          unlock_task.command = "AT+SETCRYPT" + key;
+          unlock_task.status = PENDING;
+          task_queue_.insert(task_queue_.begin() + current_task_index_ + 1, unlock_task);
+          
+          return; // 处理完握手直接退出，不参与下方的数据解析
+        } else {
+          ESP_LOGW(TAG, "找到 crypt: 标签但后续字符 %s 不是合法 HEX", candidate.c_str());
+        }
+      }
     }
-}  
+  }
+
+  // --- 常规任务解析 ---
+  if (current_task_index_ < task_queue_.size()) {
+    response_buffer_.insert(response_buffer_.end(), data.begin(), data.end());
+    parse_response();
+  } else {
+    ESP_LOGW(TAG, "GATT notify event received, but no current task available!");
+  }
+}
+
+  // --- 常规任务解析 ---
   if (current_task_index_ < task_queue_.size()) {
     response_buffer_.insert(response_buffer_.end(), data.begin(), data.end());
     parse_response();
