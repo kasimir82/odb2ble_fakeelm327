@@ -383,23 +383,36 @@ void OBD2BLEClient::on_notify(const std::vector<uint8_t> &data) {
         }
 
         if (is_hex) {
+          // --- 新增：检查队列中是否已经存在 SETCRYPT 任务 ---
+          bool already_has_crypt = false;
+          for (const auto &t : task_queue_) {
+            if (t.command.find("AT+SETCRYPT") != std::string::npos) {
+              already_has_crypt = true;
+              break;
+            }
+          }
+
+          if (!already_has_crypt) {
+            ESP_LOGI(TAG, "定位到 crypt 标签，截获源文本: %s", candidate.c_str());
+            std::string key = calculate_unlock_key(candidate);
+            ESP_LOGI(TAG, "计算出解锁 Key: %s", key.c_str());
+
+            OBD2Task unlock_task;
+            unlock_task.command = "AT+SETCRYPT" + key;
+            unlock_task.status = PENDING;
+            task_queue_.insert(task_queue_.begin() + current_task_index_ + 1, unlock_task);
+          } else {
+            ESP_LOGD(TAG, "任务队列中已存在 SETCRYPT，跳过重复插入");
+          }
+
+          // 无论是否重复插入，一旦找到合规 HEX，立即闭锁状态并返回
           this->awaiting_vin_crypto_ = false;
           this->crypto_done_ = true;
-
-          ESP_LOGI(TAG, "定位到 crypt 标签，截获源文本: %s", candidate.c_str());
-          std::string key = calculate_unlock_key(candidate);
-          ESP_LOGI(TAG, "计算出解锁 Key: %s", key.c_str());
-
-          OBD2Task unlock_task;
-          unlock_task.command = "AT+SETCRYPT" + key;
-          unlock_task.status = PENDING;
-          task_queue_.insert(task_queue_.begin() + current_task_index_ + 1, unlock_task);
-          
-          return; // 握手处理完直接返回，不跑下面的常规解析
+          return; 
         }
       }
     }
-  } // <--- 这里的括号必须准确
+  }
 
   // --- 常规任务解析 ---
   if (current_task_index_ < task_queue_.size()) {
@@ -408,7 +421,8 @@ void OBD2BLEClient::on_notify(const std::vector<uint8_t> &data) {
   } else {
     ESP_LOGW(TAG, "GATT notify event received, but no current task available!");
   }
-} 
+}
+
 
 void OBD2BLEClient::on_disconnect() {
   gattc_if_ = 0;
