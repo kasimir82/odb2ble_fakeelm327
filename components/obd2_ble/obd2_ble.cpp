@@ -1090,6 +1090,7 @@ void OBD2BLEClient::handle_mode_22(OBD2Task &task, const std::vector<uint8_t> &d
     case 0x1234:
     case 0x124A:
     case 0x124C:
+    case 0x1940:
     default: break;
   }
 }
