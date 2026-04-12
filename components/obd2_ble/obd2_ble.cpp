@@ -1090,8 +1090,23 @@ void OBD2BLEClient::handle_mode_22(OBD2Task &task, const std::vector<uint8_t> &d
     case 0x1234:
     case 0x124A:
     case 0x124C:
-    case 0x1940:
-      task.value_f = data[3] - 40;
+    case 0x1940: // 变速箱油温
+      if (data.size() > 3) {
+        // 使用 data[3] 进行计算，A - 40
+        task.value_f = (float)data[3] - 40.0f;
+        ESP_LOGD(TAG, "解析变速箱油温 (PID 1940): %.1f °C", task.value_f);
+      }
+      break;
+      
+    // 其他 GM 常见的 A-40 系列 PID
+    case 0x1137: // 可能是机油温度等
+      if (data.size() > 3) {
+        task.value_f = (float)data[3] - 40.0f;
+      }
+      break;
+
+    default: 
+      ESP_LOGW(TAG, "未定义的 Mode 22 PID: %04X", pid);
       break;
     default: break;
   }
