@@ -239,6 +239,11 @@ void OBD2BLEClient::string_to_uuid(const std::string &uuid_str, espbt::ESPBTUUID
 
 void OBD2BLEClient::process_task(OBD2Task &task, const int &command_delay, const int &command_wait, const int &response_wait, const int &publish_delay, const int &disconnect_delay) {
   unsigned long current_time = millis();
+    if (task.command == "AT+VERSION") {
+    this->awaiting_vin_crypto_ = true;
+    this->crypto_done_ = false; // 允许重新握手
+    ESP_LOGD(TAG, "检测到 AT+VERSION，准备捕获加密 HEX...");
+    }
   if (current_time - last_command_time_ >= command_delay) {
     switch (task.status) {
       case PENDING:
