@@ -1101,10 +1101,12 @@ void OBD2BLEClient::handle_mode_22(OBD2Task &task, const std::vector<uint8_t> &d
       task.value_f = (float)A - 40.0f;
       break;
 
+    case 0x1154:
     case 0x1137: // 发动机机油温度
       task.value_f = (float)A - 40.0f;
       break;
 
+    
     case 0x1153: // 机油寿命百分比
       // GM 逻辑：有些直接返回百分比，有些返回 0-255
       task.value_f = (float)A * 100.0f / 255.0f;
