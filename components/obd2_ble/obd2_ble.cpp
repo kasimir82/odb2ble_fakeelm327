@@ -1097,21 +1097,19 @@ void OBD2BLEClient::handle_mode_22(OBD2Task &task, const std::vector<uint8_t> &d
   uint8_t A = data[3]; // 第一个数据字节
 
   switch (pid) {
-    case 0x1940: // 变速箱油温
-      task.value_f = (float)A - 40.0f;
-      break;
-
+    case 0x1940:
     case 0x1154:
     case 0x1137: // 发动机机油温度
       task.value_f = (float)A - 40.0f;
       break;
-
     
     case 0x1153: // 机油寿命百分比
       // GM 逻辑：有些直接返回百分比，有些返回 0-255
       task.value_f = (float)A * 100.0f / 255.0f;
       break;
 
+    case 0x199A:
+    case 0x1155:
     case 0x2411: // 油箱剩余油量 (升)
       // 这里的 A 通常直接代表升数
       task.value_f = (float)A;
