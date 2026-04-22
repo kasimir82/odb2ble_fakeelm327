@@ -1095,7 +1095,6 @@ void OBD2BLEClient::handle_mode_22(OBD2Task &task, const std::vector<uint8_t> &d
 
   uint16_t pid = (data[1] << 8) | data[2];
   uint8_t A = data[3]; // 第一个数据字节
-  uint8_t B = data[4];
     
   switch (pid) {
     case 0x1940:
@@ -1126,13 +1125,21 @@ void OBD2BLEClient::handle_mode_22(OBD2Task &task, const std::vector<uint8_t> &d
       break;
 
     case 0x115E: // 电池电流 (安培)
-        // A 是高字节，B 是低字节 (均为 uint8_t)
-        // GM 标准公式：(A * 256 + B) 是 16位有符号整数，分辨率为 0.05A (即除以 20)
-        {
-            int16_t raw_combined = (int16_t)((A << 8) | B);
-            task.value_f = (float)raw_combined / 20.0f;
-        }
-        break;
+      // GM 标准定义该 PID 返回 2 字节数据
+      // 校验 data 长度是否满足 0x62 + PID(2字节) + A + B = 5 字节
+      if (data.size() >= 5) {
+          uint8_t B = data[4]; // 获取第二个数据字节
+          
+          // 将 A 和 B 组合成 16 位有符号整数
+          int16_t raw_combined = (int16_t)((A << 8) | B);
+          
+          // GM 标准公式：除以 20 得到真实电流值
+          task.value_f = (float)raw_combined / 20.0f;
+      } else {
+          // 如果长度不足，防止越界，赋予默认值或错误码
+          task.value_f = 0.0f; 
+      }
+      break;
 
     default:
       ESP_LOGW(TAG, "收到未定义的 Mode 22 PID: %04X, 数据: %02X", pid, A);
