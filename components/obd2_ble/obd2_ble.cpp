@@ -1095,7 +1095,8 @@ void OBD2BLEClient::handle_mode_22(OBD2Task &task, const std::vector<uint8_t> &d
 
   uint16_t pid = (data[1] << 8) | data[2];
   uint8_t A = data[3]; // 第一个数据字节
-
+  uint8_t B = data[4];
+    
   switch (pid) {
     case 0x1940:
     case 0x1154:
