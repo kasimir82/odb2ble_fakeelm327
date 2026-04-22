@@ -1125,11 +1125,13 @@ void OBD2BLEClient::handle_mode_22(OBD2Task &task, const std::vector<uint8_t> &d
       break;
 
     case 0x115E: // 电池电流 (安培)
-          // A 是原始字节 (uint8_t)，范围 0-255
-          // 128 (0x80) 为 0 安培中轴点
-          // 计算：(A - 128) * 0.1
-          task.value_f = (float)((int32_t)A - 128) * 0.1f;
-          break;
+        // A 是高字节，B 是低字节 (均为 uint8_t)
+        // GM 标准公式：(A * 256 + B) 是 16位有符号整数，分辨率为 0.05A (即除以 20)
+        {
+            int16_t raw_combined = (int16_t)((A << 8) | B);
+            task.value_f = (float)raw_combined / 20.0f;
+        }
+        break;
 
     default:
       ESP_LOGW(TAG, "收到未定义的 Mode 22 PID: %04X, 数据: %02X", pid, A);
