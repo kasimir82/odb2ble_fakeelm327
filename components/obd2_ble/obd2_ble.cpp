@@ -1124,20 +1124,20 @@ void OBD2BLEClient::handle_mode_22(OBD2Task &task, const std::vector<uint8_t> &d
       task.value_f = (float)A * 100.0f / 255.0f;
       break;
 
-    case 0x115E: // 电池电流 (安培)
-      // GM 标准定义该 PID 返回 2 字节数据
-      // 校验 data 长度是否满足 0x62 + PID(2字节) + A + B = 5 字节
+    case 0x115E: // 電池電流 (安培)
+      // 判斷數據長度（0x62 + PID(2字節) = 3字節）
       if (data.size() >= 5) {
-          uint8_t B = data[4]; // 获取第二个数据字节
+          // 情況 1：正常返回 2 個字節（A 和 B）
+          uint8_t B = data[4]; 
           
-          // 将 A 和 B 组合成 16 位有符号整数
+          // 組合為 16 位有符號整數，GM 標準分辨率為 1/20 (0.05A)
           int16_t raw_combined = (int16_t)((A << 8) | B);
-          
-          // GM 标准公式：除以 20 得到真实电流值
           task.value_f = (float)raw_combined / 20.0f;
-      } else {
-          // 如果长度不足，防止越界，赋予默认值或错误码
-          task.value_f = 0.0f; 
+      } 
+      else if (data.size() == 4) {
+          // 情況 2：異常或魔改，只返回了 1 個字節（只有 A）
+          // 以 128 為中軸，分辨率 0.1A
+          task.value_f = ((float)A - 128.0f) * 0.1f;
       }
       break;
 
